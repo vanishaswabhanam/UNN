@@ -52,6 +52,14 @@ export const createModel = (
   // Calculate total layers if not specified: input + hidden + output
   const totalLayers = parameters.layers ?? (parameters.hiddenLayers + 2);
   
+  console.log(`Creating model with: 
+    - Input shape: [${inputShape}]
+    - Output units: ${outputUnits}
+    - Is classification: ${isClassification}
+    - Total layers: ${totalLayers}
+    - Neurons per layer: ${neuronsPerLayer}
+  `);
+  
   // Create a sequential model
   const model = tf.sequential();
   
@@ -70,16 +78,37 @@ export const createModel = (
     }));
   }
   
-  // Add output layer
+  // Add output layer with appropriate activation function
+  let outputActivation: string;
+  let loss: string;
+  
+  if (isClassification) {
+    if (outputUnits > 1) {
+      // Multi-class classification
+      outputActivation = 'softmax';
+      loss = 'categoricalCrossentropy';
+    } else {
+      // Binary classification
+      outputActivation = 'sigmoid';
+      loss = 'binaryCrossentropy';
+    }
+  } else {
+    // Regression
+    outputActivation = 'linear';
+    loss = 'meanSquaredError';
+  }
+  
+  console.log(`Using output activation: ${outputActivation}, loss: ${loss}`);
+  
   model.add(tf.layers.dense({
     units: outputUnits,
-    activation: isClassification ? 'softmax' as any : 'linear' as any,
+    activation: outputActivation as any,
   }));
   
   // Compile the model
   model.compile({
     optimizer: tf.train.adam(parameters.learningRate),
-    loss: isClassification ? 'categoricalCrossentropy' : 'meanSquaredError',
+    loss: loss,
     metrics: isClassification ? ['accuracy'] : [],
   });
   
@@ -111,10 +140,93 @@ export const trainModel = async (
       throw new Error("Training data is not properly formatted. Missing required tensors.");
     }
 
-    // Validate tensor shapes without using isValidTensorShape
+    // Validate tensor shapes
     if (!trainingData.xs.shape || !trainingData.ys.shape) {
       console.error("Invalid tensor shapes:", trainingData.xs.shape, trainingData.ys.shape);
       throw new Error("Invalid tensor shapes in training data");
+    }
+    
+    // Get model input and output shapes
+    const modelInputUnits = model.inputs[0].shape[1] as number;
+    const modelOutputUnits = model.outputs[0].shape[1] as number;
+    const dataInputUnits = trainingData.xs.shape[1];
+    const dataOutputUnits = trainingData.ys.shape[1];
+    
+    console.log(`Model expects input: [*, ${modelInputUnits}], output: [*, ${modelOutputUnits}]`);
+    console.log(`Data provides input: [${trainingData.xs.shape}], output: [${trainingData.ys.shape}]`);
+    
+    // Check if shapes match
+    if (modelInputUnits !== dataInputUnits) {
+      console.error(`Input shape mismatch: model expects ${modelInputUnits} features but data has ${dataInputUnits}`);
+      throw new Error(`Input shape mismatch: model expects ${modelInputUnits} features but data has ${dataInputUnits} features`);
+    }
+    
+    if (modelOutputUnits !== dataOutputUnits) {
+      console.error(`Output shape mismatch: model expects ${modelOutputUnits} units but data has ${dataOutputUnits}`);
+      
+      // Attempt to reshape
+      if (modelOutputUnits === 1 && dataOutputUnits > 1) {
+        // We need to convert from one-hot to single value
+        console.log("Attempting to reshape output data from one-hot to single value");
+        const newYs = trainingData.ys.argMax(1).expandDims(1) as tf.Tensor2D;
+        trainingData = {
+          ...trainingData,
+          ys: newYs
+        };
+        
+        // Also reshape test data if available
+        if (trainingData.ysTest) {
+          const newYsTest = trainingData.ysTest.argMax(1).expandDims(1) as tf.Tensor2D;
+          trainingData.ysTest = newYsTest;
+        }
+        console.log("Reshaped output data to:", trainingData.ys.shape);
+      } else if (modelOutputUnits > 1 && dataOutputUnits === 1) {
+        // We need to convert from single value to one-hot
+        console.log("Attempting to reshape output data from single value to one-hot");
+        
+        // First get the values as numbers and determine number of classes
+        const yValues = Array.from(trainingData.ys.dataSync() as Float32Array).map(v => Math.round(v));
+        const numClasses = modelOutputUnits;
+        
+        // Create one-hot tensors
+        const newYs = tf.oneHot(tf.tensor1d(yValues, 'int32'), numClasses) as tf.Tensor2D;
+        trainingData = {
+          ...trainingData,
+          ys: newYs
+        };
+        
+        // Also reshape test data if available
+        if (trainingData.ysTest) {
+          const yTestValues = Array.from(trainingData.ysTest.dataSync() as Float32Array).map(v => Math.round(v));
+          const newYsTest = tf.oneHot(tf.tensor1d(yTestValues, 'int32'), numClasses) as tf.Tensor2D;
+          trainingData.ysTest = newYsTest;
+        }
+        console.log("Reshaped output data to:", trainingData.ys.shape);
+      } else {
+        throw new Error(`Cannot reshape output from ${dataOutputUnits} to ${modelOutputUnits} units`);
+      }
+    }
+    
+    // Additional validation for classification loss functions
+    const compilationDetails = model.getConfig().loss;
+    const lossFunction = typeof compilationDetails === 'string' ? compilationDetails : 'unknown';
+    
+    console.log("Model loss function:", lossFunction);
+    
+    // Categorical crossentropy requires one-hot encoded outputs
+    if (lossFunction === 'categoricalCrossentropy' && trainingData.ys.shape[1] === 1) {
+      throw new Error(
+        "Categorical crossentropy loss requires one-hot encoded targets. " +
+        "Your target data has shape [" + trainingData.ys.shape + "] but needs to be one-hot encoded."
+      );
+    }
+    
+    // Binary crossentropy requires binary values
+    if (lossFunction === 'binaryCrossentropy' && trainingData.ys.shape[1] !== 1) {
+      throw new Error(
+        "Binary crossentropy loss requires binary targets with shape [samples, 1]. " +
+        "Your target data has shape [" + trainingData.ys.shape + "]."
+      );
     }
     
     // Prepare training config

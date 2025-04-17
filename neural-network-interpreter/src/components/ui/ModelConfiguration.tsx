@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { ModelParameters } from '../../types/index';
+import { ModelParameters } from '../../types';
 import { colors, typography, shadows, borderRadius } from './theme';
 
 const Container = styled.div`
@@ -149,9 +149,13 @@ const ModelConfiguration: React.FC<ModelConfigurationProps> = ({
         newNeuronsPerLayer = newNeuronsPerLayer.slice(0, layerCount);
       }
       
+      // Calculate hidden layers from total layers (total - input - output)
+      const hiddenLayerCount = layerCount - 2; 
+      
       setParameters({
         ...parameters,
         layers: layerCount,
+        hiddenLayers: hiddenLayerCount,
         neuronsPerLayer: newNeuronsPerLayer
       });
     }

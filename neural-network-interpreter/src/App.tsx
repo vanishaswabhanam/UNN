@@ -377,12 +377,23 @@ const App: React.FC = () => {
       
       // If we have training data, use its dimensions
       if (trainingData) {
+        console.log("Training data for model building:", trainingData);
         inputShape = [trainingData.tensors.trainX.shape[1]];
-        outputUnits = networkState.taskType === 'classification' ? 
-          trainingData.labelClasses?.length || 1 : 1;
+        
+        if (networkState.taskType === 'classification') {
+          // For classification, use number of unique output labels or output vector length
+          outputUnits = trainingData.outputLabels?.length || 
+                       (trainingData.tensors.trainY.shape[1] || 1);
+          console.log("Classification output units:", outputUnits);
+        } else {
+          // For regression, make sure outputUnits is set to match the Y tensor shape
+          outputUnits = trainingData.tensors.trainY.shape[1] || 1;
+          console.log("Regression output units:", outputUnits);
+        }
       }
       
       const isClassification = networkState.taskType === 'classification';
+      console.log(`Building ${isClassification ? 'classification' : 'regression'} model with ${outputUnits} output units`);
       
       // Build the model using TensorFlow.js
       const newModel = createModel(
@@ -410,6 +421,11 @@ const App: React.FC = () => {
       // Force a re-render by setting a timeout
       setTimeout(() => {
         console.log("Current networkState after build:", networkState);
+        console.log("Model state:", model ? "Model exists" : "No model");
+        console.log("Is model built flag:", networkState.isModelBuilt);
+        console.log("Is training flag:", networkState.isTraining);
+        console.log("Should main train button show:", model && !networkState.isTraining);
+        console.log("Should backup train button show:", model && !networkState.isModelBuilt && !networkState.isTraining);
       }, 100);
       
       // Display a visual confirmation
@@ -447,91 +463,221 @@ const App: React.FC = () => {
         }
       };
       
-      // Train the model
-      const result = await trainModel(
-        model,
-        trainingData,
-        networkState.modelParameters,
-        callbacks
-      );
+      console.log("Training data structure:", trainingData);
       
-      console.log('Training complete:', result);
-      
-      // For classification tasks, compute confusion matrix and additional metrics
-      if (networkState.taskType === 'classification' && trainingData.labelClasses) {
-        // Get test data
-        const { xs: testData, ys: testLabels } = trainingData;
+      try {
+        // Prepare training data based on task type
+        let formattedTrainingData;
         
-        // Make predictions on test data
-        const predictions = model.predict(testData) as tf.Tensor;
-        const predictionValues = await predictions.argMax(1).array() as number[];
-        const actualValues = await testLabels.argMax(1).array() as number[];
-        
-        // Compute confusion matrix
-        const classCount = trainingData.labelClasses.length;
-        const confusionMatrix = Array(classCount).fill(0).map(() => Array(classCount).fill(0));
-        
-        // Fill confusion matrix
-        for (let i = 0; i < predictionValues.length; i++) {
-          const actual = actualValues[i];
-          const predicted = predictionValues[i];
-          confusionMatrix[actual][predicted]++;
+        if (networkState.taskType === 'classification') {
+          console.log("Formatting data for classification task");
+          // Check if Y tensors need one-hot encoding
+          let trainY = trainingData.tensors.trainY;
+          let testY = trainingData.tensors.testY;
+          
+          // Check output shape vs model shape
+          console.log("Model output layer units:", model.getWeights()[model.getWeights().length - 1].shape[0]);
+          const modelOutputUnits = model.getWeights()[model.getWeights().length - 1].shape[0];
+          
+          // If the number of classes in our Y data doesn't match the model's output units, we have a problem
+          if (trainY.shape[1] > 1 && trainY.shape[1] !== modelOutputUnits) {
+            console.warn(`Warning: Y data has ${trainY.shape[1]} classes but model has ${modelOutputUnits} output units.`);
+            
+            // Try to reshape the Y data to match the model's expected output
+            if (modelOutputUnits === 1) {
+              // Convert one-hot back to binary (take the index of max value)
+              const trainYValues = Array.from(trainY.argMax(1).dataSync() as Float32Array);
+              const testYValues = Array.from(testY.argMax(1).dataSync() as Float32Array);
+              
+              // Create binary tensors (for binary classification)
+              const newTrainY = tf.tensor2d(trainYValues.map(v => [v]), [trainYValues.length, 1]);
+              const newTestY = tf.tensor2d(testYValues.map(v => [v]), [testYValues.length, 1]);
+              
+              console.log("Reshaped trainY from", trainY.shape, "to", newTrainY.shape);
+              
+              formattedTrainingData = {
+                xs: trainingData.tensors.trainX,
+                ys: newTrainY,
+                xsTest: trainingData.tensors.testX,
+                ysTest: newTestY
+              };
+            } else {
+              // We can try to create a new model with the right number of output units
+              console.error("Critical shape mismatch. Consider rebuilding the model with correct output units.");
+              throw new Error(`Shape mismatch: Y data has shape [${trainY.shape}] but model expects output units: ${modelOutputUnits}`);
+            }
+          } else if (trainY.shape.length === 2 && trainY.shape[1] === 1) {
+            console.log("Converting Y tensors to one-hot encoding");
+            
+            // Determine number of classes
+            const numClasses = trainingData.outputLabels?.length ||
+              (trainingData.isClassification ? Math.max(
+                ...Array.from(trainY.dataSync() as Float32Array),
+                ...Array.from(testY.dataSync() as Float32Array)
+              ) + 1 : 1);
+              
+            console.log(`Number of classes: ${numClasses}`);
+            
+            // Check if numClasses matches model output
+            if (numClasses !== modelOutputUnits && modelOutputUnits > 1) {
+              console.error(`Number of classes (${numClasses}) doesn't match model output units (${modelOutputUnits}).`);
+              throw new Error(`Model expects ${modelOutputUnits} classes but data has ${numClasses} classes.`);
+            }
+            
+            // Convert to one-hot encoding
+            // First get the values as numbers
+            const trainYValues = Array.from(trainY.dataSync() as Float32Array).map(v => Math.round(v));
+            const testYValues = Array.from(testY.dataSync() as Float32Array).map(v => Math.round(v));
+            
+            console.log("Y values range:", Math.min(...trainYValues), "to", Math.max(...trainYValues));
+            
+            // Create one-hot tensors
+            const newTrainY = tf.oneHot(tf.tensor1d(trainYValues, 'int32'), numClasses);
+            const newTestY = tf.oneHot(tf.tensor1d(testYValues, 'int32'), numClasses);
+            
+            console.log("New trainY shape:", newTrainY.shape);
+            console.log("New testY shape:", newTestY.shape);
+            
+            formattedTrainingData = {
+              xs: trainingData.tensors.trainX,
+              ys: newTrainY,
+              xsTest: trainingData.tensors.testX,
+              ysTest: newTestY
+            };
+          } else {
+            // Already in the right format
+            formattedTrainingData = {
+              xs: trainingData.tensors.trainX,
+              ys: trainingData.tensors.trainY,
+              xsTest: trainingData.tensors.testX,
+              ysTest: trainingData.tensors.testY
+            };
+          }
+        } else {
+          // For regression, just use the data as is
+          formattedTrainingData = {
+            xs: trainingData.tensors.trainX,
+            ys: trainingData.tensors.trainY,
+            xsTest: trainingData.tensors.testX,
+            ysTest: trainingData.tensors.testY
+          };
         }
         
-        // Calculate precision and recall for each class
-        const precisions = [];
-        const recalls = [];
-        
-        for (let i = 0; i < classCount; i++) {
-          const truePositives = confusionMatrix[i][i];
-          const falsePositives = confusionMatrix.reduce((sum, row, idx) => idx !== i ? sum + row[i] : sum, 0);
-          const falseNegatives = confusionMatrix[i].reduce((sum, val, idx) => idx !== i ? sum + val : sum, 0);
-          
-          const precision = truePositives / (truePositives + falsePositives) || 0;
-          const recall = truePositives / (truePositives + falseNegatives) || 0;
-          
-          precisions.push(precision);
-          recalls.push(recall);
-        }
-        
-        // Calculate average precision, recall, and F1 score
-        const avgPrecision = precisions.reduce((a, b) => a + b, 0) / classCount;
-        const avgRecall = recalls.reduce((a, b) => a + b, 0) / classCount;
-        const f1Score = 2 * (avgPrecision * avgRecall) / (avgPrecision + avgRecall) || 0;
-        
-        setEvaluationMetrics({
-          accuracy: result.evaluationResult.accuracy,
-          loss: result.evaluationResult.loss,
-          precision: avgPrecision,
-          recall: avgRecall,
-          f1Score,
-          confusionMatrix,
-          classLabels: trainingData.labelClasses
+        console.log("Formatted training data shapes:", {
+          xs: formattedTrainingData.xs.shape,
+          ys: formattedTrainingData.ys.shape,
+          xsTest: formattedTrainingData.xsTest?.shape,
+          ysTest: formattedTrainingData.ysTest?.shape
         });
-      } else {
-        // For regression, just set accuracy and loss
-        setEvaluationMetrics({
-          loss: result.evaluationResult.loss,
-          accuracy: result.evaluationResult.accuracy
+        
+        // Train the model
+        const result = await trainModel(
+          model,
+          formattedTrainingData,
+          networkState.modelParameters,
+          callbacks
+        );
+        
+        console.log('Training complete:', result);
+        
+        // For classification tasks, compute confusion matrix and additional metrics
+        if (networkState.taskType === 'classification' && trainingData.outputLabels) {
+          // Get test data
+          const testData = trainingData.tensors.testX;
+          const testLabels = trainingData.tensors.testY;
+          
+          // Make predictions on test data
+          const predictions = model.predict(testData) as tf.Tensor;
+          const predictionValues = await predictions.argMax(1).array() as number[];
+          const actualValues = await testLabels.argMax(1).array() as number[];
+          
+          // Compute confusion matrix
+          const classCount = trainingData.outputLabels.length;
+          const confusionMatrix = Array(classCount).fill(0).map(() => Array(classCount).fill(0));
+          
+          // Fill confusion matrix
+          for (let i = 0; i < predictionValues.length; i++) {
+            const actual = actualValues[i];
+            const predicted = predictionValues[i];
+            confusionMatrix[actual][predicted]++;
+          }
+          
+          // Calculate precision and recall for each class
+          const precisions = [];
+          const recalls = [];
+          
+          for (let i = 0; i < classCount; i++) {
+            const truePositives = confusionMatrix[i][i];
+            const falsePositives = confusionMatrix.reduce((sum, row, idx) => idx !== i ? sum + row[i] : sum, 0);
+            const falseNegatives = confusionMatrix[i].reduce((sum, val, idx) => idx !== i ? sum + val : sum, 0);
+            
+            const precision = truePositives / (truePositives + falsePositives) || 0;
+            const recall = truePositives / (truePositives + falseNegatives) || 0;
+            
+            precisions.push(precision);
+            recalls.push(recall);
+          }
+          
+          // Calculate average precision, recall, and F1 score
+          const avgPrecision = precisions.reduce((a, b) => a + b, 0) / classCount;
+          const avgRecall = recalls.reduce((a, b) => a + b, 0) / classCount;
+          const f1Score = 2 * (avgPrecision * avgRecall) / (avgPrecision + avgRecall) || 0;
+          
+          setEvaluationMetrics({
+            accuracy: result.evaluationResult.accuracy,
+            loss: result.evaluationResult.loss,
+            precision: avgPrecision,
+            recall: avgRecall,
+            f1Score,
+            confusionMatrix,
+            classLabels: trainingData.outputLabels
+          });
+        } else {
+          // For regression, just set accuracy and loss
+          setEvaluationMetrics({
+            loss: result.evaluationResult.loss,
+            accuracy: result.evaluationResult.accuracy
+          });
+        }
+        
+        setNetworkState({
+          ...networkState,
+          isTraining: false
+        });
+        
+        alert(`Training complete! Final loss: ${result.evaluationResult.loss.toFixed(4)}${
+          result.evaluationResult.accuracy ? `, Accuracy: ${result.evaluationResult.accuracy.toFixed(4)}` : ''
+        }`);
+      } catch (trainingError) {
+        console.error('Error during training:', trainingError);
+        
+        // Show a more detailed error message
+        let errorMessage = 'Error training the model. ';
+        
+        if (trainingError instanceof Error) {
+          if (trainingError.message.includes('categorical_crossentropy')) {
+            errorMessage += 'There is a problem with the format of your classification data. ' +
+                           'This is likely because your data needs to be one-hot encoded.';
+          } else {
+            errorMessage += trainingError.message;
+          }
+        } else {
+          errorMessage += 'Unknown error occurred.';
+        }
+        
+        alert(errorMessage);
+        setNetworkState({
+          ...networkState,
+          isTraining: false
         });
       }
-      
-      setNetworkState({
-        ...networkState,
-        isTraining: false
-      });
-      
-      alert(`Training complete! Final loss: ${result.evaluationResult.loss.toFixed(4)}${
-        result.evaluationResult.accuracy ? `, Accuracy: ${result.evaluationResult.accuracy.toFixed(4)}` : ''
-      }`);
-      
     } catch (error) {
-      console.error('Error training model:', error);
+      console.error('Error in handleTrainModel:', error);
       setNetworkState({
         ...networkState,
         isTraining: false
       });
-      alert('Error training the model. Check console for details.');
+      alert(`Error training the model: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -564,13 +710,14 @@ const App: React.FC = () => {
                   onBuildModel={handleBuildModel}
                 />
                 
-                {networkState.isModelBuilt && !networkState.isTraining && (
+                {/* Main training button */}
+                {model && !networkState.isTraining && (
                   <TrainButton onClick={handleTrainModel}>
                     Train Neural Network
                   </TrainButton>
                 )}
                 
-                {/* Backup train button that will appear if model exists regardless of state */}
+                {/* Backup training button only shows when there's a serious state mismatch */}
                 {model && !networkState.isModelBuilt && !networkState.isTraining && (
                   <TrainButton 
                     onClick={() => {
