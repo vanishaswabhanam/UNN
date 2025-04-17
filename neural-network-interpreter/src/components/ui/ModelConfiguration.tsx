@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { ModelParameters } from '../../types';
+import { ModelParameters } from '../../types/index';
 import { colors, typography, shadows, borderRadius } from './theme';
 
 const Container = styled.div`
-  background-color: ${colors.ghostWhite};
+  background-color: ${colors.white};
   border-radius: ${borderRadius.lg};
   padding: 24px;
   margin-bottom: 24px;
@@ -13,9 +13,9 @@ const Container = styled.div`
 
 const Title = styled.h3`
   font-family: ${typography.fontFamily};
-  font-size: ${typography.fontSizes.subheading};
+  font-size: ${typography.fontSizes.heading};
   font-weight: ${typography.fontWeights.bold};
-  color: ${colors.eerieBlack};
+  color: ${colors.darkBlue};
   margin-top: 0;
   margin-bottom: 8px;
 `;
@@ -23,7 +23,7 @@ const Title = styled.h3`
 const Description = styled.p`
   font-family: ${typography.fontFamily};
   font-size: ${typography.fontSizes.body};
-  color: ${colors.mediumGray};
+  color: ${colors.textMedium};
   margin-bottom: 20px;
 `;
 
@@ -42,56 +42,42 @@ const Label = styled.label`
   display: block;
   margin-bottom: 8px;
   font-weight: ${typography.fontWeights.medium};
-  color: ${colors.eerieBlack};
+  color: ${colors.textDark};
   font-family: ${typography.fontFamily};
 `;
 
-const ParameterDescription = styled.div`
+const OptionGroup = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+`;
+
+const OptionButton = styled.button<{ selected: boolean }>`
+  padding: 8px 16px;
+  background-color: ${props => props.selected ? colors.mediumBlue : colors.lightBlue};
+  color: ${props => props.selected ? 'white' : colors.textDark};
+  border: none;
+  border-radius: ${borderRadius.full};
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: ${typography.fontFamily};
   font-size: ${typography.fontSizes.small};
-  color: ${colors.mediumGray};
-  margin-bottom: 8px;
-  font-family: ${typography.fontFamily};
-`;
-
-const Input = styled.input`
-  width: 100%;
-  padding: 12px 16px;
-  border: 1px solid ${colors.lightGray};
-  border-radius: ${borderRadius.md};
-  font-size: ${typography.fontSizes.body};
-  font-family: ${typography.fontFamily};
+  font-weight: ${props => props.selected ? typography.fontWeights.bold : typography.fontWeights.medium};
   
-  &:focus {
-    border-color: ${colors.primary};
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(75, 75, 245, 0.25);
-  }
-`;
-
-const Select = styled.select`
-  width: 100%;
-  padding: 12px 16px;
-  border: 1px solid ${colors.lightGray};
-  border-radius: ${borderRadius.md};
-  font-size: ${typography.fontSizes.body};
-  background-color: white;
-  font-family: ${typography.fontFamily};
-  
-  &:focus {
-    border-color: ${colors.primary};
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(75, 75, 245, 0.25);
+  &:hover {
+    background-color: ${props => props.selected ? colors.mediumBlue : colors.lightGray};
   }
 `;
 
 const BuildButton = styled.button`
-  background-color: ${colors.primary};
+  background-color: ${colors.mediumBlue};
   color: white;
   border: none;
-  border-radius: ${borderRadius.md};
+  border-radius: ${borderRadius.full};
   padding: 14px 24px;
   cursor: pointer;
-  font-weight: ${typography.fontWeights.medium};
+  font-weight: ${typography.fontWeights.bold};
   font-size: ${typography.fontSizes.body};
   transition: all 0.2s;
   font-family: ${typography.fontFamily};
@@ -100,42 +86,31 @@ const BuildButton = styled.button`
   margin-top: 32px;
   
   &:hover {
-    background-color: ${colors.secondary};
+    background-color: ${colors.darkBlue};
     transform: translateY(-2px);
     box-shadow: ${shadows.md};
   }
 `;
 
-const NetworkPreview = styled.div`
-  background-color: rgba(216, 223, 239, 0.3);
-  border-radius: ${borderRadius.md};
-  padding: 20px;
-  margin-bottom: 20px;
-  border: 1px solid ${colors.aliceBlue};
-`;
+const activationOptions = [
+  { value: 'relu', label: 'ReLU' },
+  { value: 'sigmoid', label: 'Sigmoid' },
+  { value: 'tanh', label: 'Tanh' }
+];
 
-const LayerGrid = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-`;
+const batchSizeOptions = [
+  { value: 16, label: '16' },
+  { value: 32, label: '32' },
+  { value: 64, label: '64' },
+  { value: 128, label: '128' }
+];
 
-const Layer = styled.div<{ isActive?: boolean }>`
-  background-color: ${props => props.isActive ? colors.vanilla : 'white'};
-  border: 1px solid ${props => props.isActive ? colors.primary : colors.lightGray};
-  border-radius: ${borderRadius.md};
-  padding: 12px;
-  text-align: center;
-  width: 100px;
-  font-family: ${typography.fontFamily};
-  box-shadow: ${shadows.sm};
-`;
-
-const Arrow = styled.div`
-  color: ${colors.mediumGray};
-  font-size: 20px;
-`;
+const layerOptions = [
+  { value: 2, label: '2' },
+  { value: 3, label: '3' },
+  { value: 4, label: '4' },
+  { value: 5, label: '5' }
+];
 
 interface ModelConfigurationProps {
   initialParameters: ModelParameters;
@@ -154,20 +129,22 @@ const ModelConfiguration: React.FC<ModelConfigurationProps> = ({
     onParametersChange(parameters);
   }, [parameters, onParametersChange]);
   
-  const handleLayerCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const layerCount = parseInt(e.target.value);
+  const handleLayerCountChange = (layerCount: number) => {
     if (layerCount >= 2 && layerCount <= 5) {
       // Adjust neurons per layer array when number of layers changes
       let newNeuronsPerLayer = [...parameters.neuronsPerLayer];
       
-      if (layerCount > parameters.layers) {
+      // Get current layers or default to 3 if undefined
+      const currentLayers = parameters.layers ?? 3;
+      
+      if (layerCount > currentLayers) {
         // Add new layers with default 4 neurons
-        const additionalLayers = layerCount - parameters.layers;
+        const additionalLayers = layerCount - currentLayers;
         newNeuronsPerLayer = [
           ...newNeuronsPerLayer,
           ...new Array(additionalLayers).fill(4)
         ];
-      } else if (layerCount < parameters.layers) {
+      } else if (layerCount < currentLayers) {
         // Remove excess layers
         newNeuronsPerLayer = newNeuronsPerLayer.slice(0, layerCount);
       }
@@ -180,48 +157,11 @@ const ModelConfiguration: React.FC<ModelConfigurationProps> = ({
     }
   };
   
-  const handleActivationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleOptionChange = (field: keyof ModelParameters, value: any) => {
     setParameters({
       ...parameters,
-      activationFunction: e.target.value
+      [field]: value
     });
-  };
-  
-  const handleLearningRateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setParameters({
-      ...parameters,
-      learningRate: parseFloat(e.target.value)
-    });
-  };
-  
-  const handleBatchSizeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setParameters({
-      ...parameters,
-      batchSize: parseInt(e.target.value)
-    });
-  };
-  
-  const handleEpochsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setParameters({
-      ...parameters,
-      epochs: parseInt(e.target.value)
-    });
-  };
-  
-  const renderLayerPreview = () => {
-    return (
-      <LayerGrid>
-        {parameters.neuronsPerLayer.map((neurons, index) => (
-          <React.Fragment key={index}>
-            <Layer isActive={index === parameters.neuronsPerLayer.length - 1}>
-              {index === 0 ? 'Input' : index === parameters.neuronsPerLayer.length - 1 ? 'Output' : 'Hidden'}
-              <div>{neurons} neurons</div>
-            </Layer>
-            {index < parameters.neuronsPerLayer.length - 1 && <Arrow>→</Arrow>}
-          </React.Fragment>
-        ))}
-      </LayerGrid>
-    );
   };
   
   return (
@@ -229,82 +169,104 @@ const ModelConfiguration: React.FC<ModelConfigurationProps> = ({
       <Title>Configure Neural Network</Title>
       <Description>Customize your model architecture and training parameters</Description>
       
-      <NetworkPreview>
-        {renderLayerPreview()}
-      </NetworkPreview>
-      
       <FormGrid>
         <FormGroup>
-          <Label htmlFor="layers">Number of Layers</Label>
-          <ParameterDescription>How many layers in your network (2-5)</ParameterDescription>
-          <Input
-            id="layers"
-            type="range"
-            min="2"
-            max="5"
-            step="1"
-            value={parameters.layers}
-            onChange={handleLayerCountChange}
-          />
-          <div style={{ textAlign: 'center', marginTop: '8px' }}>{parameters.layers} layers</div>
+          <Label>Number of Layers</Label>
+          <OptionGroup>
+            {layerOptions.map(option => (
+              <OptionButton
+                key={option.value}
+                selected={(parameters.layers ?? 3) === option.value}
+                onClick={() => handleLayerCountChange(option.value)}
+              >
+                {option.label} Layers
+              </OptionButton>
+            ))}
+          </OptionGroup>
         </FormGroup>
         
         <FormGroup>
-          <Label htmlFor="activation">Activation Function</Label>
-          <ParameterDescription>Non-linearity applied to neuron outputs</ParameterDescription>
-          <Select
-            id="activation"
-            value={parameters.activationFunction}
-            onChange={handleActivationChange}
-          >
-            <option value="relu">ReLU</option>
-            <option value="sigmoid">Sigmoid</option>
-            <option value="tanh">Tanh</option>
-          </Select>
+          <Label>Activation Function</Label>
+          <OptionGroup>
+            {activationOptions.map(option => (
+              <OptionButton
+                key={option.value}
+                selected={parameters.activationFunction === option.value}
+                onClick={() => handleOptionChange('activationFunction', option.value)}
+              >
+                {option.label}
+              </OptionButton>
+            ))}
+          </OptionGroup>
         </FormGroup>
         
         <FormGroup>
-          <Label htmlFor="learning-rate">Learning Rate</Label>
-          <ParameterDescription>Step size for gradient descent</ParameterDescription>
-          <Input
-            id="learning-rate"
-            type="number"
-            value={parameters.learningRate}
-            onChange={handleLearningRateChange}
-            step="0.001"
-            min="0.001"
-            max="1"
-          />
+          <Label>Batch Size</Label>
+          <OptionGroup>
+            {batchSizeOptions.map(option => (
+              <OptionButton
+                key={option.value}
+                selected={parameters.batchSize === option.value}
+                onClick={() => handleOptionChange('batchSize', option.value)}
+              >
+                {option.label}
+              </OptionButton>
+            ))}
+          </OptionGroup>
         </FormGroup>
         
         <FormGroup>
-          <Label htmlFor="batch-size">Batch Size</Label>
-          <ParameterDescription>Samples processed before updating weights</ParameterDescription>
-          <Select
-            id="batch-size"
-            value={parameters.batchSize}
-            onChange={e => setParameters({...parameters, batchSize: parseInt(e.target.value)})}
-          >
-            <option value="16">16</option>
-            <option value="32">32</option>
-            <option value="64">64</option>
-            <option value="128">128</option>
-          </Select>
+          <Label>Learning Rate</Label>
+          <OptionGroup>
+            <OptionButton
+              selected={parameters.learningRate === 0.001}
+              onClick={() => handleOptionChange('learningRate', 0.001)}
+            >
+              0.001
+            </OptionButton>
+            <OptionButton
+              selected={parameters.learningRate === 0.01}
+              onClick={() => handleOptionChange('learningRate', 0.01)}
+            >
+              0.01
+            </OptionButton>
+            <OptionButton
+              selected={parameters.learningRate === 0.1}
+              onClick={() => handleOptionChange('learningRate', 0.1)}
+            >
+              0.1
+            </OptionButton>
+          </OptionGroup>
         </FormGroup>
         
         <FormGroup>
-          <Label htmlFor="epochs">Epochs</Label>
-          <ParameterDescription>Complete passes through the dataset</ParameterDescription>
-          <Input
-            id="epochs"
-            type="range"
-            min="1"
-            max="100"
-            step="1"
-            value={parameters.epochs}
-            onChange={handleEpochsChange}
-          />
-          <div style={{ textAlign: 'center', marginTop: '8px' }}>{parameters.epochs} epochs</div>
+          <Label>Epochs</Label>
+          <OptionGroup>
+            <OptionButton
+              selected={parameters.epochs === 10}
+              onClick={() => handleOptionChange('epochs', 10)}
+            >
+              10
+            </OptionButton>
+            <OptionButton
+              selected={parameters.epochs === 20}
+              onClick={() => handleOptionChange('epochs', 20)}
+            >
+              20
+            </OptionButton>
+            <OptionButton
+              selected={parameters.epochs === 50}
+              onClick={() => handleOptionChange('epochs', 50)}
+            >
+              50
+            </OptionButton>
+            <OptionButton
+              selected={parameters.epochs === 100}
+              onClick={() => handleOptionChange('epochs', 100)}
+            >
+              100
+            </OptionButton>
+          </OptionGroup>
         </FormGroup>
       </FormGrid>
       

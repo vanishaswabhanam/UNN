@@ -4,7 +4,7 @@ import { TaskType } from '../../types';
 import { colors, typography, shadows, borderRadius } from './theme';
 
 const Container = styled.div`
-  background-color: ${colors.ghostWhite};
+  background-color: ${colors.white};
   border-radius: ${borderRadius.lg};
   padding: 24px;
   margin-bottom: 24px;
@@ -13,9 +13,9 @@ const Container = styled.div`
 
 const Title = styled.h3`
   font-family: ${typography.fontFamily};
-  font-size: ${typography.fontSizes.subheading};
+  font-size: ${typography.fontSizes.heading};
   font-weight: ${typography.fontWeights.bold};
-  color: ${colors.eerieBlack};
+  color: ${colors.darkBlue};
   margin-top: 0;
   margin-bottom: 8px;
 `;
@@ -23,7 +23,7 @@ const Title = styled.h3`
 const Description = styled.p`
   font-family: ${typography.fontFamily};
   font-size: ${typography.fontSizes.body};
-  color: ${colors.mediumGray};
+  color: ${colors.textMedium};
   margin-bottom: 20px;
 `;
 
@@ -34,42 +34,20 @@ const TaskButtonGroup = styled.div`
 `;
 
 const TaskButton = styled.button<{ selected: boolean }>`
-  flex: 1;
-  padding: 24px 16px;
-  background-color: ${props => props.selected ? colors.vanilla : 'white'};
-  border: 2px solid ${props => props.selected ? colors.primary : colors.lightGray};
-  border-radius: ${borderRadius.lg};
+  padding: 12px 24px;
+  background-color: ${props => props.selected ? colors.mediumBlue : colors.lightBlue};
+  color: ${props => props.selected ? 'white' : colors.textDark};
+  border: none;
+  border-radius: ${borderRadius.full};
   cursor: pointer;
   transition: all 0.2s;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
   font-family: ${typography.fontFamily};
+  font-size: ${typography.fontSizes.body};
+  font-weight: ${props => props.selected ? typography.fontWeights.bold : typography.fontWeights.medium};
   
   &:hover {
-    transform: ${props => props.selected ? 'none' : 'translateY(-3px)'};
-    box-shadow: ${props => props.selected ? 'none' : shadows.md};
+    background-color: ${props => props.selected ? colors.mediumBlue : colors.lightGray};
   }
-`;
-
-const TaskIcon = styled.div`
-  font-size: 36px;
-  margin-bottom: 12px;
-`;
-
-const TaskTitle = styled.h4`
-  font-size: ${typography.fontSizes.body};
-  font-weight: ${typography.fontWeights.medium};
-  margin: 0 0 4px 0;
-  color: ${colors.eerieBlack};
-`;
-
-const TaskDescription = styled.p`
-  font-size: ${typography.fontSizes.small};
-  margin: 0;
-  color: ${colors.mediumGray};
-  text-align: center;
 `;
 
 interface TaskSelectionProps {
@@ -82,14 +60,10 @@ const TaskSelection: React.FC<TaskSelectionProps> = ({ selectedTask, onTaskSelec
     {
       type: 'classification' as TaskType,
       title: 'Classification',
-      description: 'Categorize data into distinct classes',
-      icon: '🏷️'
     },
     {
       type: 'regression' as TaskType,
       title: 'Regression',
-      description: 'Predict continuous numerical values',
-      icon: '📈'
     }
   ];
   
@@ -105,9 +79,7 @@ const TaskSelection: React.FC<TaskSelectionProps> = ({ selectedTask, onTaskSelec
             selected={selectedTask === task.type}
             onClick={() => onTaskSelect(task.type)}
           >
-            <TaskIcon>{task.icon}</TaskIcon>
-            <TaskTitle>{task.title}</TaskTitle>
-            <TaskDescription>{task.description}</TaskDescription>
+            {task.title}
           </TaskButton>
         ))}
       </TaskButtonGroup>

@@ -1,35 +1,34 @@
 // Color palette based on design inspiration
 export const colors = {
   // Main palette
-  aliceBlue: '#D8DFEF', // Light blue background
-  honeydew: '#CFD5CA',  // Light green accent
-  vanilla: '#F7F0A3',   // Yellow highlight 
-  eerieBlack: '#202021', // Dark background/text
-  ghostWhite: '#F8F9FA', // Light background
+  lightBlue: '#e9f0f9', // Light blue background
+  mediumBlue: '#4B80C5', // Medium blue for buttons and accents
+  darkBlue: '#2E5C9F',  // Darker blue for hover states and headers
+  highlight: '#C5E8E5', // Light teal/mint highlight (replacing yellow)
+  textDark: '#333333',  // Dark text color
+  textMedium: '#545E63', // Medium text color
   
   // Additional UI colors
-  primary: '#4B4BF5',    // Primary button/accent color (blue)
-  secondary: '#202C8F',  // Secondary button color (dark blue)
-  lightBlue: '#B7CFFF',  // Light blue accent
-  mediumGray: '#6C757D', // Text and subtle UI elements
-  lightGray: '#DEE2E6',  // Borders and dividers
+  white: '#FFFFFF',
+  lightGray: '#E5E9EF',
+  mediumGray: '#A0A8B0',
   
   // Status colors
-  success: '#28a745',
-  warning: '#ffc107',
-  danger: '#dc3545',
-  info: '#17a2b8'
+  success: '#4CAF50',
+  warning: '#FFC107',
+  danger: '#F44336',
+  info: '#2196F3'
 };
 
 // Typography
 export const typography = {
-  fontFamily: "'Urbanist', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+  fontFamily: "'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   fontSizes: {
     small: '0.875rem',
     body: '1rem',
-    subheading: '1.5rem',
-    heading: '2.25rem',
-    title: '3rem'
+    subheading: '1.25rem',
+    heading: '1.5rem',
+    title: '2.25rem'
   },
   fontWeights: {
     regular: 400,
@@ -54,17 +53,17 @@ export const spacing = {
 
 // Shadows
 export const shadows = {
-  sm: '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)',
-  md: '0 4px 6px rgba(0,0,0,0.1)',
-  lg: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)'
+  sm: '0 1px 3px rgba(0,0,0,0.1)',
+  md: '0 2px 4px rgba(0,0,0,0.1)',
+  lg: '0 4px 8px rgba(0,0,0,0.1)'
 };
 
 // Border radius
 export const borderRadius = {
-  sm: '0.375rem',
-  md: '0.75rem',
-  lg: '1.25rem',
-  xl: '1.5rem',
+  sm: '4px',
+  md: '6px',
+  lg: '8px',
+  xl: '12px',
   full: '9999px'
 };
 

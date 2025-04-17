@@ -1,8 +1,9 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
-import { ModelParameters } from '../../types';
+import styled from 'styled-components';
+import { ModelParameters } from '../../types/index';
 import { colors } from '../ui/theme';
 
 type NeuronProps = {
@@ -104,10 +105,12 @@ const NeuralNetworkVisualization: React.FC<NeuralNetworkVisualizationProps> = ({
     
     // Place input layer 
     const inputLayerX = -5;
-    const layerSpacing = 10 / (params.layers - 1);
+    // Make sure layers is defined before using it
+    const totalLayers = params.layers || 3;
+    const layerSpacing = 10 / (totalLayers - 1);
     
     // Add neurons for each layer
-    for (let layer = 0; layer < params.layers; layer++) {
+    for (let layer = 0; layer < totalLayers; layer++) {
       const neuronsInLayer = params.neuronsPerLayer[layer] || 4;
       const x = inputLayerX + layer * layerSpacing;
       
@@ -119,9 +122,9 @@ const NeuralNetworkVisualization: React.FC<NeuralNetworkVisualizationProps> = ({
         
         // Different colors for different layers
         let color;
-        if (layer === 0) color = colors.primary; // Input layer (blue)
-        else if (layer === params.layers - 1) color = colors.vanilla; // Output layer (yellow)
-        else color = colors.aliceBlue; // Hidden layer (light blue)
+        if (layer === 0) color = colors.mediumBlue; // Input layer (blue)
+        else if (layer === totalLayers - 1) color = colors.highlight; // Output layer (teal)
+        else color = colors.lightBlue; // Hidden layer (light blue)
         
         neurons.push(
           <Neuron 

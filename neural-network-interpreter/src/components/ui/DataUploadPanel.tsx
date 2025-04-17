@@ -3,68 +3,18 @@ import styled from 'styled-components';
 import { colors, typography, shadows, borderRadius } from './theme';
 
 const UploadContainer = styled.div`
-  background-color: ${colors.ghostWhite};
+  background-color: ${colors.white};
   border-radius: ${borderRadius.lg};
   padding: 24px;
   margin-bottom: 24px;
   box-shadow: ${shadows.md};
 `;
 
-const UploadArea = styled.div`
-  border: 2px dashed ${colors.lightGray};
-  border-radius: ${borderRadius.md};
-  padding: 40px 20px;
-  text-align: center;
-  margin-bottom: 20px;
-  transition: all 0.3s ease;
-  cursor: pointer;
-  background-color: white;
-  
-  &:hover {
-    border-color: ${colors.primary};
-    background-color: rgba(75, 75, 245, 0.05);
-  }
-`;
-
-const FileInput = styled.input`
-  display: none;
-`;
-
-const Button = styled.button`
-  background-color: ${colors.primary};
-  color: white;
-  border: none;
-  border-radius: ${borderRadius.md};
-  padding: 12px 20px;
-  cursor: pointer;
-  font-family: ${typography.fontFamily};
-  font-weight: ${typography.fontWeights.medium};
-  font-size: ${typography.fontSizes.body};
-  transition: all 0.2s;
-  
-  &:hover {
-    background-color: ${colors.secondary};
-    transform: translateY(-2px);
-  }
-  
-  &:disabled {
-    background-color: ${colors.mediumGray};
-    cursor: not-allowed;
-    transform: none;
-  }
-`;
-
-const FileName = styled.div`
-  margin-top: 12px;
-  font-size: ${typography.fontSizes.small};
-  color: ${colors.mediumGray};
-`;
-
 const Title = styled.h3`
   font-family: ${typography.fontFamily};
-  font-size: ${typography.fontSizes.subheading};
+  font-size: ${typography.fontSizes.heading};
   font-weight: ${typography.fontWeights.bold};
-  color: ${colors.eerieBlack};
+  color: ${colors.darkBlue};
   margin-top: 0;
   margin-bottom: 8px;
 `;
@@ -72,14 +22,70 @@ const Title = styled.h3`
 const Description = styled.p`
   font-family: ${typography.fontFamily};
   font-size: ${typography.fontSizes.body};
-  color: ${colors.mediumGray};
+  color: ${colors.textMedium};
   margin-bottom: 20px;
 `;
 
+const SimpleUploadArea = styled.div`
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+`;
+
+const FileInput = styled.input`
+  display: none;
+`;
+
+const UploadButton = styled.button`
+  background-color: ${colors.lightBlue};
+  color: ${colors.textDark};
+  border: none;
+  border-radius: ${borderRadius.full};
+  padding: 10px 20px;
+  cursor: pointer;
+  font-family: ${typography.fontFamily};
+  font-weight: ${typography.fontWeights.medium};
+  font-size: ${typography.fontSizes.body};
+  transition: all 0.2s;
+  
+  &:hover {
+    background-color: ${colors.lightGray};
+  }
+`;
+
+const ProcessButton = styled.button`
+  background-color: ${colors.mediumBlue};
+  color: white;
+  border: none;
+  border-radius: ${borderRadius.full};
+  padding: 12px 20px;
+  cursor: pointer;
+  font-family: ${typography.fontFamily};
+  font-weight: ${typography.fontWeights.bold};
+  font-size: ${typography.fontSizes.body};
+  transition: all 0.2s;
+  
+  &:hover {
+    background-color: ${colors.darkBlue};
+  }
+  
+  &:disabled {
+    background-color: ${colors.mediumGray};
+    cursor: not-allowed;
+  }
+`;
+
+const FileName = styled.div`
+  margin-left: 8px;
+  font-size: ${typography.fontSizes.body};
+  color: ${colors.textMedium};
+`;
+
 const SuccessIndicator = styled.div`
-  background-color: ${colors.vanilla};
-  border-radius: ${borderRadius.md};
-  padding: 12px 16px;
+  background-color: ${colors.highlight};
+  border-radius: ${borderRadius.full};
+  padding: 8px 16px;
   margin-bottom: 20px;
   display: flex;
   align-items: center;
@@ -87,7 +93,7 @@ const SuccessIndicator = styled.div`
 `;
 
 const SuccessIcon = styled.span`
-  font-size: 20px;
+  font-size: 16px;
   margin-right: 12px;
 `;
 
@@ -128,27 +134,30 @@ const DataUploadPanel: React.FC<DataUploadPanelProps> = ({ onFileUpload }) => {
       {uploaded && (
         <SuccessIndicator>
           <SuccessIcon>✓</SuccessIcon>
-          <span>Data uploaded successfully! Your file is ready for processing.</span>
+          <span>Data processed successfully!</span>
         </SuccessIndicator>
       )}
       
-      <UploadArea onClick={handleUploadClick}>
+      <SimpleUploadArea>
         <FileInput 
           type="file" 
           ref={fileInputRef}
           onChange={handleFileChange} 
           accept=".csv"
         />
-        <div>Drag and drop a CSV file here, or click to select</div>
-        {selectedFile && <FileName>Selected: {selectedFile.name}</FileName>}
-      </UploadArea>
+        <UploadButton onClick={handleUploadClick}>
+          Select File
+        </UploadButton>
+        {selectedFile && <FileName>{selectedFile.name}</FileName>}
+      </SimpleUploadArea>
       
-      <Button 
-        onClick={handleSubmit} 
-        disabled={!selectedFile || uploaded}
-      >
-        {uploaded ? 'Processed' : 'Process Data'}
-      </Button>
+      {selectedFile && !uploaded && (
+        <ProcessButton 
+          onClick={handleSubmit}
+        >
+          Process Data
+        </ProcessButton>
+      )}
     </UploadContainer>
   );
 };

@@ -20,6 +20,19 @@ export interface ModelParameters {
   taskType?: TaskType;
 }
 
+export interface ModelMetrics {
+  accuracy?: number;
+  loss: number;
+  precision?: number;
+  recall?: number;
+}
+
+export interface ModelPrediction {
+  value: number | number[];
+  confidence?: number;
+  label?: string;
+}
+
 export interface NeuralNetworkState {
   taskType: TaskType | null;
   modelParameters: ModelParameters;
